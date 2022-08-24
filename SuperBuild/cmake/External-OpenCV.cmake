@@ -1,5 +1,6 @@
 set(_proj_name opencv)
 set(_SB_BINARY_DIR "${SB_BINARY_DIR}/${_proj_name}")
+set(_CONTRIB_DIR "D:/dev/lib/opencv_contrib/modules")
 
 if (WIN32)
   set(WIN32_CMAKE_EXTRA_ARGS -DPYTHON3_NUMPY_INCLUDE_DIRS=${PYTHON_HOME}/lib/site-packages/numpy/core/include
@@ -56,6 +57,7 @@ ExternalProject_Add(${_proj_name}
     -DBUILD_opencv_ocl=OFF
     -DBUILD_opencv_ts=OFF
     -DBUILD_opencv_xfeatures2d=ON
+    -DOPENCV_EXTRA_MODULES_PATH:STRING=${_CONTRIB_DIR}
     -DOPENCV_ALLOCATOR_STATS_COUNTER_TYPE=int64_t
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${SB_INSTALL_DIR}

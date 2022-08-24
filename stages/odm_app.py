@@ -7,6 +7,7 @@ from opendm import system
 from opendm import log
 
 from stages.dataset import ODMLoadDatasetStage
+from stages.find import ODMFindGCPStage
 from stages.run_opensfm import ODMOpenSfMStage
 from stages.openmvs import ODMOpenMVSStage
 from stages.odm_meshing import ODMeshingStage
@@ -37,6 +38,7 @@ class ODMApp:
         
         dataset = ODMLoadDatasetStage('dataset', args, progress=5.0,
                                           verbose=args.verbose)
+        
         find = ODMFindGCPStage('find', args, progress=10.0)
         split = ODMSplitStage('split', args, progress=75.0)
         merge = ODMMergeStage('merge', args, progress=100.0)
@@ -73,6 +75,7 @@ class ODMApp:
 
         dataset.connect(split) \
                 .connect(merge) \
+                .connect(find)\
                 .connect(opensfm)
 
         if args.fast_orthophoto:

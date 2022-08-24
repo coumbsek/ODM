@@ -476,6 +476,12 @@ def config(argv=None, parser=None):
                               'geo_x geo_y geo_z im_x im_y image_name [gcp_name] [extra1] [extra2]\n'
                               'Default: %(default)s'))
 
+    parser.add_argument('--find-gcp',
+                        metavar='<path string>',
+                        action=StoreValue,
+                        default=None,
+                        help='Use a file containing coordinates of the GCPs used in pictures. Default: %(default)s')
+
     parser.add_argument('--geo',
                         metavar='<path string>',
                         action=StoreValue,

@@ -12,6 +12,7 @@ lxml==4.6.1
 matplotlib==3.3.3
 networkx==2.5
 numpy==1.21.1
+opencv-contrib-python
 Pillow==8.3.2
 vmem==1.0.1
 pyodm==1.5.8
