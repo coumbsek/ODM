@@ -28,17 +28,18 @@ def read_coord_file(filepath):
 def process_image(image_path, aruco_dict, coords):
     img = cv2.imread(image_path)
     if img is None:
-        print('error reading image: {}'.format(image_path))
+        log.ODM_ERROR('error reading image: {}'.format(image_path))
         return
     # convert image to gray
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # find markers
     params = cv2.aruco.DetectorParameters_create()
-    corners, ids, _ = aruco.detectMarkers(gray,
+    params.minMarkerPerimeterRate = 0.01
+    corners, ids, _ = aruco.detectMarkers(img,
                                             aruco_dict,
                                             parameters=params)
     if ids is None:
-        print('No markers found on image {}'.format(image_path))
+        log.ODM_ERROR('No markers found on image {}'.format(image_path))
         return
 
     gcp_lines = []
@@ -53,14 +54,13 @@ def process_image(image_path, aruco_dict, coords):
                 coords[j][0], coords[j][1], coords[j][2],
                 x, y, os.path.basename(image_path), j))
         else:
-            print("No coordinates for {}".format(j))
+            log.ODM_INFO("No coordinates for {}".format(j))
 
     return gcp_lines
   
 class ODMFindGCPStage(types.ODM_Stage):
     def process(self, args, outputs):
-        tree = types.ODM_Tree(args.project_path, args.gcp, args.geo)
-        outputs['tree'] = tree
+        tree = outputs['tree']
 
         # get images directory
         images_dir = tree.dataset_raw
@@ -74,7 +74,7 @@ class ODMFindGCPStage(types.ODM_Stage):
         else:
             aruco_dict = aruco.Dictionary_get(args.dict)
 
-        output_file_path = "D:\\find_gcp.csv"
+        output_file_path = tree.find_gcp_detected
         output_file = open(output_file_path, 'w')
         output_file.write("EPSG:{}".format("2154"))
 

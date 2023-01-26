@@ -219,6 +219,7 @@ class ODM_Tree(object):
         # order to keep track all files al directories during the
         # whole reconstruction process.
         self.dataset_raw = os.path.join(self.root_path, 'images')
+        self.odm_find = os.path.join(self.root_path, 'odm_findGCP')
         self.opensfm = os.path.join(self.root_path, 'opensfm')
         self.openmvs = os.path.join(self.opensfm, 'undistorted', 'openmvs')
         self.odm_meshing = os.path.join(self.root_path, 'odm_meshing')
@@ -230,6 +231,9 @@ class ODM_Tree(object):
         self.odm_report = os.path.join(self.root_path, 'odm_report')
 
         # important files paths
+
+        # findGCP
+        self.find_gcp_detected = os.path.join(self.odm_find, 'gcp_detected.txt')
 
         # benchmarking
         self.benchmarking = os.path.join(self.root_path, 'benchmark.txt')

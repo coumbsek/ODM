@@ -464,7 +464,9 @@ def config(argv=None, parser=None):
                              'mapping. Can be one of %(choices)s. '
                              'Default: %(default)s ')
 
-    parser.add_argument('--gcp',
+    gcp_args = parser.add_mutually_exclusive_group()
+
+    gcp_args.add_argument('--gcp',
                         metavar='<path string>',
                         action=StoreValue,
                         default=None,
@@ -476,11 +478,18 @@ def config(argv=None, parser=None):
                               'geo_x geo_y geo_z im_x im_y image_name [gcp_name] [extra1] [extra2]\n'
                               'Default: %(default)s'))
 
-    parser.add_argument('--find-gcp',
+    gcp_args.add_argument('--find-gcp',
                         metavar='<path string>',
                         action=StoreValue,
                         default=None,
-                        help='Use a file containing coordinates of the GCPs used in pictures. Default: %(default)s')
+                        help='Use a file containing coordinates of the ArUCos GCPs used in pictures. Default: %(default)s')
+
+    parser.add_argument('--aruco-dict',
+                        metavar='<integer>',
+                        action=StoreValue,
+                        default=99,
+                        type=int,
+                        help='Dictionary used for the ArUCo detection. Default: %(default)s')
 
     parser.add_argument('--geo',
                         metavar='<path string>',

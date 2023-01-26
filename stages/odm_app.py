@@ -7,7 +7,7 @@ from opendm import system
 from opendm import log
 
 from stages.dataset import ODMLoadDatasetStage
-from stages.find import ODMFindGCPStage
+from stages.odm_find import ODMFindGCPStage
 from stages.run_opensfm import ODMOpenSfMStage
 from stages.openmvs import ODMOpenMVSStage
 from stages.odm_meshing import ODMeshingStage
