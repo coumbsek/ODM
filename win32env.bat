@@ -10,6 +10,8 @@ if defined _OLD_CODEPAGE (
 
 set ODMBASE=%~dp0
 set GDALBASE=%ODMBASE%venv\Lib\site-packages\osgeo
+set GDAL_DATA=%GDALBASE%\data\gdal
+set GDAL_DRIVER_PATH=%GDALBASE%\gdalplugins
 set OSFMBASE=%ODMBASE%SuperBuild\install\bin\opensfm\bin
 set SBBIN=%ODMBASE%SuperBuild\install\bin
 
@@ -21,8 +23,8 @@ set PYTHONPATH=%VIRTUAL_ENV%
 set PYENVCFG=%VIRTUAL_ENV%\pyvenv.cfg
 
 rem Hot-patching pyvenv.cfg
-echo home = %ODMBASE%\python38> %PYENVCFG%
-echo include-system-site-packages = false>> %PYENVCFG%
+echo home = %ODMBASE%\python38> "%PYENVCFG%"
+echo include-system-site-packages = false>> "%PYENVCFG%"
 
 rem Hot-patching cv2 extension configs
 echo BINARIES_PATHS = [r"%SBBIN%"] + BINARIES_PATHS> venv\Lib\site-packages\cv2\config.py

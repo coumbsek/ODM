@@ -5,6 +5,8 @@ import numpy
 import math
 import time
 import shutil
+import functools
+from joblib import delayed, Parallel
 from opendm.system import run
 from opendm import point_cloud
 from opendm import io
@@ -22,6 +24,16 @@ import threading
 
 from .ground_rectification.rectify import run_rectification
 from . import pdal
+
+try:
+    # GDAL >= 3.3
+    from osgeo_utils.gdal_proximity import main as gdal_proximity
+except ModuleNotFoundError:
+    # GDAL <= 3.2
+    try:
+        from osgeo.utils.gdal_proximity import main as gdal_proximity
+    except:
+        pass
 
 def classify(lasFile, scalar, slope, threshold, window, verbose=False):
     start = datetime.now()
@@ -260,7 +272,7 @@ def create_dem(input_point_cloud, dem_type, output_type='max', radiuses=['0.56']
                 '"{tiles_vrt}" "{geotiff}"'.format(**kwargs))
 
     if apply_smoothing:
-        median_smoothing(geotiff_path, output_path)
+        median_smoothing(geotiff_path, output_path, num_workers=max_workers)
         os.remove(geotiff_path)
     else:
         os.replace(geotiff_path, output_path)
@@ -290,18 +302,26 @@ def compute_euclidean_map(geotiff_path, output_path, overwrite=False):
 
     if not os.path.exists(output_path) or overwrite:
         log.ODM_INFO("Computing euclidean distance: %s" % output_path)
-        run('gdal_proximity.py "%s" "%s" -values %s' % (geotiff_path, output_path, nodata))
 
-        if os.path.exists(output_path):
-            return output_path
+        if gdal_proximity is not None:
+            try:
+                gdal_proximity(['gdal_proximity.py', geotiff_path, output_path, '-values', str(nodata)])
+            except Exception as e:
+                log.ODM_WARNING("Cannot compute euclidean distance: %s" % str(e))
+
+            if os.path.exists(output_path):
+                return output_path
+            else:
+                log.ODM_WARNING("Cannot compute euclidean distance file: %s" % output_path)
         else:
-            log.ODM_WARNING("Cannot compute euclidean distance file: %s" % output_path)
+            log.ODM_WARNING("Cannot compute euclidean map, gdal_proximity is missing")
+            
     else:
         log.ODM_INFO("Found a euclidean distance map: %s" % output_path)
         return output_path
 
 
-def median_smoothing(geotiff_path, output_path, smoothing_iterations=1):
+def median_smoothing(geotiff_path, output_path, smoothing_iterations=1, window_size=512, num_workers=1):
     """ Apply median smoothing """
     start = datetime.now()
 
@@ -313,24 +333,52 @@ def median_smoothing(geotiff_path, output_path, smoothing_iterations=1):
     with rasterio.open(geotiff_path) as img:
         nodata = img.nodatavals[0]
         dtype = img.dtypes[0]
+        shape = img.shape
         arr = img.read()[0]
-
-        nodata_locs = numpy.where(arr == nodata)
-
-        # Median filter (careful, changing the value 5 might require tweaking)
-        # the lines below. There's another numpy function that takes care of 
-        # these edge cases, but it's slower.
         for i in range(smoothing_iterations):
             log.ODM_INFO("Smoothing iteration %s" % str(i + 1))
-            arr = ndimage.median_filter(arr, size=9, output=dtype, mode='nearest')
+            rows, cols = numpy.meshgrid(numpy.arange(0, shape[0], window_size), numpy.arange(0, shape[1], window_size))
+            rows = rows.flatten()
+            cols = cols.flatten()
+            rows_end = numpy.minimum(rows + window_size, shape[0])
+            cols_end= numpy.minimum(cols + window_size, shape[1])
+            windows = numpy.dstack((rows, cols, rows_end, cols_end)).reshape(-1, 4)
 
-        # Median filter leaves a bunch of zeros in nodata areas
-        arr[nodata_locs] = nodata
+            filter = functools.partial(ndimage.median_filter, size=9, output=dtype, mode='nearest')
 
+            # threading backend and GIL released filter are important for memory efficiency and multi-core performance
+            window_arrays = Parallel(n_jobs=num_workers, backend='threading')(delayed(window_filter_2d)(arr, nodata , window, 9, filter) for window in windows)
+
+            for window, win_arr in zip(windows, window_arrays):
+                arr[window[0]:window[2], window[1]:window[3]] = win_arr
+        log.ODM_INFO("Smoothing completed in %s" % str(datetime.now() - start))
         # write output
-        with rasterio.open(output_path, 'w', **img.profile) as imgout:
+        with rasterio.open(output_path, 'w', BIGTIFF="IF_SAFER", **img.profile) as imgout:
             imgout.write(arr, 1)
-    
-    log.ODM_INFO('Completed smoothing to create %s in %s' % (output_path, datetime.now() - start))
 
+    log.ODM_INFO('Completed smoothing to create %s in %s' % (output_path, datetime.now() - start))
     return output_path
+
+
+def window_filter_2d(arr, nodata, window, kernel_size, filter):
+    """
+    Apply a filter to dem within a window, expects to work with kernal based filters
+
+    :param geotiff_path: path to the geotiff to filter
+    :param window: the window to apply the filter, should be a list contains row start, col_start, row_end, col_end
+    :param kernel_size: the size of the kernel for the filter, works with odd numbers, need to test if it works with even numbers
+    :param filter: the filter function which takes a 2d array as input and filter results as output.
+    """
+    shape = arr.shape[:2]
+    if window[0] < 0 or window[1] < 0 or window[2] > shape[0] or window[3] > shape[1]:
+        raise Exception('Window is out of bounds')
+    expanded_window = [ max(0, window[0] - kernel_size // 2), max(0, window[1] - kernel_size // 2), min(shape[0], window[2] + kernel_size // 2), min(shape[1], window[3] + kernel_size // 2) ]
+    win_arr = arr[expanded_window[0]:expanded_window[2], expanded_window[1]:expanded_window[3]]
+    # Should have a better way to handle nodata, similar to the way the filter algorithms handle the border (reflection, nearest, interpolation, etc).
+    # For now will follow the old approach to guarantee identical outputs
+    nodata_locs = win_arr == nodata
+    win_arr = filter(win_arr)
+    win_arr[nodata_locs] = nodata
+    win_arr = win_arr[window[0] - expanded_window[0] : window[2] - expanded_window[0], window[1] - expanded_window[1] : window[3] - expanded_window[1]]
+    log.ODM_DEBUG("Filtered window: %s" % str(window))
+    return win_arr

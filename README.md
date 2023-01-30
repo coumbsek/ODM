@@ -193,9 +193,9 @@ Finally you'll want to delete the files by using your Windows File Manager (Expl
 
 If you have installed to a different directory by changing the `--import` command you ran to install you must use that directory name to delete the correct files. This is likely the case if you have multiple ODM installations or are updating an already-installed installation.
 
-## Native Install (Ubuntu 20.04)
+## Native Install (Ubuntu 21.04)
 
-You can run ODM natively on Ubuntu 20.04 LTS (although we don't recommend it):  
+You can run ODM natively on Ubuntu 21.04 (although we don't recommend it):  
 
 1. Download the source from [here](https://github.com/OpenDroneMap/ODM/archive/master.zip)
 2. Run `bash configure.sh install`
@@ -287,3 +287,7 @@ ODM makes use of [several libraries](https://github.com/OpenDroneMap/ODM/blob/ma
 ## Citation
 
 > *OpenDroneMap Authors* ODM - A command line toolkit to generate maps, point clouds, 3D models and DEMs from drone, balloon or kite images. **OpenDroneMap/ODM GitHub Page** 2020; [https://github.com/OpenDroneMap/ODM](https://github.com/OpenDroneMap/ODM)
+
+## Trademark
+
+See [Trademark Guidelines](https://github.com/OpenDroneMap/documents/blob/master/TRADEMARK.md)

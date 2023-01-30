@@ -5,7 +5,7 @@ import ctypes
 from opendm import log
 from repoze.lru import lru_cache
 
-def gpu_disabled_by_user():
+def gpu_disabled_by_user_env():
     return bool(os.environ.get('ODM_NO_GPU'))
 
 @lru_cache(maxsize=None)
@@ -38,7 +38,9 @@ def has_popsift_and_can_handle_texsize(width, height):
 def get_cuda_compute_version(device_id = 0):
     cuda_lib = "libcuda.so"
     if sys.platform == 'win32':
-        cuda_lib = "nvcuda.dll"
+        cuda_lib = os.path.join(os.environ.get('SYSTEMROOT'), 'system32', 'nvcuda.dll')
+        if not os.path.isfile(cuda_lib):
+            cuda_lib = "nvcuda.dll"
 
     nvcuda = ctypes.cdll.LoadLibrary(cuda_lib)
 
@@ -68,10 +70,12 @@ def get_cuda_compute_version(device_id = 0):
 
     return (compute_major.value, compute_minor.value)
 
-@lru_cache(maxsize=None)
-def has_gpu():
-    if gpu_disabled_by_user():
+def has_gpu(args):
+    if gpu_disabled_by_user_env():
         log.ODM_INFO("Disabling GPU features (ODM_NO_GPU is set)")
+        return False
+    if args.no_gpu:
+        log.ODM_INFO("Disabling GPU features (--no-gpu is set)")
         return False
 
     if sys.platform == 'win32':

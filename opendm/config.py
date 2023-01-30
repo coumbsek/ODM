@@ -157,12 +157,11 @@ def config(argv=None, parser=None):
                             '%(default)s'))
 
     parser.add_argument('--matcher-neighbors',
-                        metavar='<integer>',
+                        metavar='<positive integer>',
                         action=StoreValue,
-                        default=8,
+                        default=0,
                         type=int,
-                        help='Number of nearest images to pre-match based on GPS '
-                             'exif data. Set to 0 to skip pre-matching. Default: %(default)s')
+                        help='Perform image matching with the nearest images based on GPS exif data. Set to 0 to match by triangulation. Default: %(default)s')
 
     parser.add_argument('--use-fixed-camera-params',
                         action=StoreTrue,
@@ -233,10 +232,16 @@ def config(argv=None, parser=None):
                     metavar='<string>',
                     action=StoreValue,
                     default='incremental',
-                    choices=['incremental', 'triangulation'],
-                    help=('Choose the structure from motion algorithm. For aerial datasets, if camera GPS positions and angles are available, triangulation can generate better results. '
+                    choices=['incremental', 'triangulation', 'planar'],
+                    help=('Choose the structure from motion algorithm. For aerial datasets, if camera GPS positions and angles are available, triangulation can generate better results. For planar scenes captured at fixed altitude with nadir-only images, planar can be much faster. '
                         'Can be one of: %(choices)s. Default: '
                         '%(default)s'))
+
+    parser.add_argument('--sky-removal',
+                action=StoreTrue,
+                nargs=0,
+                default=False,
+                help='Automatically compute image masks using AI to remove the sky. Experimental. Default: %(default)s')
 
     parser.add_argument('--use-3dmesh',
                     action=StoreTrue,
@@ -270,7 +275,13 @@ def config(argv=None, parser=None):
                         'caps the maximum resolution of image outputs and '
                         'resizes images when necessary, resulting in faster processing and '
                         'lower memory usage. Since GSD is an estimate, sometimes ignoring it can result in slightly better image output quality. Default: %(default)s')
-
+    
+    parser.add_argument('--no-gpu',
+                    action=StoreTrue,
+                    nargs=0,
+                    default=False,
+                    help='Do not use GPU acceleration, even if it\'s available. Default: %(default)s')
+    
     parser.add_argument('--mesh-size',
                         metavar='<positive integer>',
                         action=StoreValue,
@@ -302,7 +313,7 @@ def config(argv=None, parser=None):
                     default=3,
                     type=float,
                     help=('Automatically crop image outputs by creating a smooth buffer '
-                          'around the dataset boundaries, shrinked by N meters. '
+                          'around the dataset boundaries, shrunk by N meters. '
                           'Use 0 to disable cropping. '
                           'Default: %(default)s'))
 
@@ -323,6 +334,14 @@ def config(argv=None, parser=None):
                     help='Automatically set a boundary using camera shot locations to limit the area of the reconstruction. '
                     'This can help remove far away background artifacts (sky, background landscapes, etc.). See also --boundary. '
                     'Default: %(default)s')
+
+    parser.add_argument('--auto-boundary-distance',
+                    metavar='<positive float>',
+                    action=StoreValue,
+                    type=float,
+                    default=0,
+                    help='Specify the distance between camera shot locations and the outer edge of the boundary when computing the boundary with --auto-boundary. Set to 0 to automatically choose a value. '
+                         'Default: %(default)s')
 
     parser.add_argument('--pc-quality',
                     metavar='<string>',
@@ -359,6 +378,12 @@ def config(argv=None, parser=None):
                 nargs=0,
                 default=False,
                 help='Export the georeferenced point cloud in Entwine Point Tile (EPT) format. Default: %(default)s')
+
+    parser.add_argument('--pc-copc',
+                action=StoreTrue,
+                nargs=0,
+                default=False,
+                help='Save the georeferenced point cloud in Cloud Optimized Point Cloud (COPC) format. Default: %(default)s')
 
     parser.add_argument('--pc-filter',
                         metavar='<positive float>',
@@ -540,7 +565,7 @@ def config(argv=None, parser=None):
                         action=StoreValue,
                         type=float,
                         default=5,
-                        help='DSM/DTM resolution in cm / pixel. Note that this value is capped by a ground sampling distance (GSD) estimate. To remove the cap, check --ignore-gsd also.'
+                        help='DSM/DTM resolution in cm / pixel. Note that this value is capped to 2x the ground sampling distance (GSD) estimate. To remove the cap, check --ignore-gsd also.'
                              ' Default: %(default)s')
 
     parser.add_argument('--dem-decimation',
@@ -617,6 +642,30 @@ def config(argv=None, parser=None):
                     help='Generate static tiles for orthophotos and DEMs that are '
                          'suitable for viewers like Leaflet or OpenLayers. '
                          'Default: %(default)s')
+
+    parser.add_argument('--3d-tiles',
+                        action=StoreTrue,
+                        nargs=0,
+                        default=False,
+                        help='Generate OGC 3D Tiles outputs. Default: %(default)s')
+
+    parser.add_argument('--rolling-shutter',
+                    action=StoreTrue,
+                    nargs=0,
+                    default=False,
+                    help='Turn on rolling shutter correction. If the camera '
+                         'has a rolling shutter and the images were taken in motion, you can turn on this option '
+                         'to improve the accuracy of the results. See also --rolling-shutter-readout. '
+                         'Default: %(default)s')
+
+    parser.add_argument('--rolling-shutter-readout',
+                        type=float,
+                        action=StoreValue,
+                        metavar='<positive integer>',
+                        default=0,
+                    help='Override the rolling shutter readout time for your camera sensor (in milliseconds), instead of using the rolling shutter readout database. ' 
+                    'Note that not all cameras are present in the database. Set to 0 to use the database value. '
+                    'Default: %(default)s')
 
     parser.add_argument('--build-overviews',
                         action=StoreTrue,
@@ -783,9 +832,6 @@ def config(argv=None, parser=None):
     if args.fast_orthophoto:
       log.ODM_INFO('Fast orthophoto is turned on, automatically setting --skip-3dmodel')
       args.skip_3dmodel = True
-    #   if not 'sfm_algorithm_is_set' in args:
-    #     log.ODM_INFO('Fast orthophoto is turned on, automatically setting --sfm-algorithm to triangulation')
-    #     args.sfm_algorithm = 'triangulation'
 
     if args.pc_rectify and not args.pc_classify:
       log.ODM_INFO("Ground rectify is turned on, automatically turning on point cloud classification")
